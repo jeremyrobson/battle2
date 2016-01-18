@@ -1,0 +1,191 @@
+<!doctype html>
+<html>
+<head>
+<script src="game.js"></script>
+<script src="town.js"></script>
+<script>
+
+var mx = 0, my = 0, mouse_pressed = false;
+var party;
+const OFFSET_X = 304, OFFSET_Y = 200;
+var txtOffsetX, txtOffsetY;
+
+var Unit = function(ai, color, next) {
+	this.ai = ai;
+	
+	if (ai == "npc") {
+		this.x = randint(0,4096);
+		this.y = randint(0,4096);
+		this.momentum = Math.random() * 6;
+	}
+	else {
+		this.x = 0;
+		this.y = 0;
+		this.momentum = 8;
+	}
+	this.width = 32;
+	this.height = 64;
+	this.color = (color) ? color : new Color(randint(0,256), randint(0,256), randint(0,256), 1.0);
+	this.vel = 0;
+	this.destx = this.x;
+	this.desty = this.y;
+	this.next = next;
+	this.dx = 0; //drawx
+	this.dy = 0; //drawy
+};
+
+Unit.prototype.loop = function(offsetx, offsety) {
+	if (!this.move(this.destx, this.desty, 0)) {
+		this.destx = randint(0,4096);
+		this.desty = randint(0,4096);
+	}
+}
+
+Unit.prototype.move = function(destx, desty, length) {
+	var distance = get_distance(this.x, this.y, destx, desty);
+	
+	if (distance > 50)
+		this.vel = this.momentum;
+	else if (this.vel > 0 && length == 0)
+		this.vel -= 1.0;
+	else
+		this.vel = 0;
+	
+	var radians = Math.atan2(desty - this.y, destx - this.x);
+	
+	this.x += Math.cos(radians) * this.vel;
+	this.y += Math.sin(radians) * this.vel;
+	
+	if (this.x < 0) this.x = 0;
+	if (this.x > 4095) this.x = 4095;
+	if (this.y < 0) this.y = 0;
+	if (this.y > 4095) this.y = 4095;
+	
+	//recursion/linked-list used to make following
+	if (this.next) this.next.move(this.x, this.y, length);
+	
+	return this.vel > 0; //false if reached dest
+};
+
+Unit.prototype.draw = function(ctx, offsetx, offsety) {
+	//calculate draw x,y
+	this.dx = offsetx + this.x;
+	this.dy = offsety + this.y;
+	
+	if (this.dx > -32 && this.dx < 640 && this.dy > -64 && this.dy < 480) {
+		ctx.fillStyle = this.color.toString();
+		ctx.fillRect(this.dx, this.dy, this.width, this.height);
+	}
+};
+
+function create_party() {
+	var _x = 0;
+	var _y = 0;
+	var _vel = 0;
+	var _momentum = 0;
+	var _radians = 0;
+	var path = [];
+	var next = {"x":0, "y":0};
+	
+	var units = [];
+	units[4] = new Unit("user", new Color(255, 255, 0, 1.0));
+	units[3] = new Unit("user", new Color(255, 0, 255, 1.0), units[4]);
+	units[2] = new Unit("user", new Color(0, 0, 255, 1.0), units[3]);
+	units[1] = new Unit("user", new Color(0, 255, 0, 1.0), units[2]);
+	units[0] = new Unit("user", new Color(0, 255, 255, 1.0), units[1]);
+	
+	function loop() {
+		if (!units[0].move(next.x, next.y, path.length) && path.length > 0) {
+			next = path.shift();
+		}
+		
+		_x = units[0].x;
+		_y = units[0].y;
+		
+		txtOffsetX.value = _x;
+		txtOffsetY.value = _y;
+	}
+	
+	function click() {
+		var tx = clamp(mx + _x, 0, 4095);
+		var ty = clamp(my + _y, 0, 4095);
+		path.push({"x": tx, "y": ty});
+	}
+	
+	function draw(ctx) {
+		path.forEach(function(p) {
+			ctx.fillStyle = "rgba(255,255,255,0.5)";
+			ctx.fillRect(p.x - _x + OFFSET_X, p.y - _y + OFFSET_Y, 16, 16);
+		});
+		
+		ctx.fillStyle = "rgba(255,255,255,1.0)";
+		ctx.fillRect(next.x - _x + OFFSET_X, next.y - _y + OFFSET_Y, 16, 16);
+	}
+	
+	function get_x() { return _x; }
+	function get_y() { return _y; }
+	function get_offset_x() { return OFFSET_X - _x; }
+	function get_offset_y() { return OFFSET_Y - _y; }
+	
+	return {
+		units: units,
+		get_x: get_x,
+		get_y: get_y,
+		get_offset_x: get_offset_x,
+		get_offset_y: get_offset_y,
+		click: click,
+		loop: loop,
+		draw: draw
+	};
+}
+
+function loop() {
+	town.loop(party.get_offset_x(), party.get_offset_y());
+	party.loop();
+	draw();
+	
+	requestAnimationFrame(loop);
+}
+
+function mouse_move(e) {
+	mx = e.offsetX-304;
+	my = e.offsetY-200;
+}
+
+function mouse_down(e) {
+	mouse_pressed = true;
+	party.click();
+}
+
+function mouse_up(e) {
+	mouse_pressed = false;
+}
+
+function draw() {
+	town.draw(context, party.get_offset_x(), party.get_offset_y(), party.get_x(), party.get_y());
+	party.draw(context);
+}
+
+window.onload = function() {
+	canvas = document.getElementById("canvas");
+	canvas.onmousedown = mouse_down;
+	canvas.onmousemove = mouse_move;
+	canvas.onmouseup = mouse_up;
+	context = canvas.getContext("2d");
+	
+	party = create_party();
+	town = new Town(party);
+	
+	txtOffsetX = document.getElementById("offsetx");
+	txtOffsetY = document.getElementById("offsety");
+	
+	requestAnimationFrame(loop);
+};
+</script>
+</head>
+<body>
+<canvas id="canvas" width="640" height="480"></canvas>
+<input id="offsetx" type="text">
+<input id="offsety" type="text">
+</body>
+</html>

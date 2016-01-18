@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+<head>
+<script src="dialog.js"></script>
+<script src="unit.js"></script>
+<script src="battlemap.js"></script>
+<script src="battle.js"></script>
+<script src="game.js"></script>
+<script>
+
+var canvas, context;//, lasttick, fps, then, delta, start;
+var game;
+var SKY_GRADIENT, GROUND_GRADIENT;
+
+function load() {
+	canvas = document.getElementById("canvas");
+	canvas.onmousedown = canvas_mousedown;
+	context = canvas.getContext("2d");
+	context.textBaseline = "top";
+	//then = 0;
+	//fps = 0;
+	//start = Date.now();
+
+	SKY_GRADIENT = context.createLinearGradient(0,0,0,160);
+	SKY_GRADIENT.addColorStop(0,"rgb(0,0,200)");
+	SKY_GRADIENT.addColorStop(1,"rgb(150,150,255)");
+
+	GROUND_GRADIENT = context.createLinearGradient(0,160,0,480);
+	GROUND_GRADIENT.addColorStop(0,"rgb(255,255,255)");
+	GROUND_GRADIENT.addColorStop(1,"rgb(100,100,100)");
+
+	game = new Game();
+	
+	requestAnimationFrame(game.loop);
+}
+
+function canvas_mousedown(e) {
+	var mx = e.offsetX;
+	var my = e.offsetY;
+	game.battle.mouse_down(mx, my);
+}
+
+window.onload = function() {
+	load();
+};
+</script>
+</head>
+<body>
+<canvas id="canvas" width="640" height="480"></canvas>
+</body>	
+</html>
